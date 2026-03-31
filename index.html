@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Magma 1.0.0 | Authentication</title>
+    <style>
+        :root {
+            --primary: #ff4500; /* Magma Orange */
+            --bg: #0a0a0a;
+            --card: #151515;
+            --text: #ffffff;
+            --error: #ff3333;
+            --success: #00ff88;
+        }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .auth-container {
+            background: var(--card);
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.7);
+            border: 1px solid #222;
+            width: 380px;
+            text-align: center;
+            position: relative;
+        }
+
+        .auth-container::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; height: 3px;
+            background: linear-gradient(90deg, transparent, var(--primary), transparent);
+        }
+
+        h1 {
+            font-size: 1.4rem;
+            margin-bottom: 5px;
+            color: var(--primary);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .subtitle {
+            font-size: 0.8rem;
+            color: #666;
+            margin-bottom: 30px;
+        }
+
+        .input-group {
+            margin-bottom: 20px;
+            text-align: left;
+        }
+
+        label {
+            display: block;
+            font-size: 0.7rem;
+            color: #888;
+            margin-bottom: 5px;
+            margin-left: 5px;
+            text-transform: uppercase;
+        }
+
+        input {
+            width: 100%;
+            padding: 12px;
+            background: #000;
+            border: 1px solid #333;
+            border-radius: 6px;
+            color: var(--primary);
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 1rem;
+            box-sizing: border-box;
+            outline: none;
+            transition: border 0.3s;
+            text-align: center;
+        }
+
+        input:focus {
+            border-color: var(--primary);
+        }
+
+        button {
+            width: 100%;
+            padding: 14px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-weight: bold;
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            transition: opacity 0.3s, transform 0.2s;
+        }
+
+        button:hover {
+            opacity: 0.9;
+            transform: translateY(-1px);
+        }
+
+        button:disabled {
+            background: #444;
+            cursor: not-allowed;
+        }
+
+        #status {
+            margin-top: 20px;
+            font-size: 0.85rem;
+            min-height: 20px;
+        }
+
+        .footer {
+            margin-top: 30px;
+            font-size: 0.7rem;
+            color: #444;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        /* Animation für Ladestatus */
+        .loading {
+            display: inline-block;
+            width: 10px; height: 10px;
+            border: 2px solid rgba(255,255,255,.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 1s ease-in-out infinite;
+            margin-right: 8px;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+
+<div class="auth-container">
+    <h1>Magma</h1>
+    <div class="subtitle">Magma 1.0.0- Security System</div>
+
+    <div class="input-group">
+        <label>Enter License Key</label>
+        <input type="text" id="keyInput" placeholder="Magma-000000-000000-000000" spellcheck="false">
+    </div>
+
+    <button id="authBtn" onclick="verifyLicense()">Launch Executor</button>
+
+    <div id="status">Warte auf Eingabe...</div>
+
+    <div class="footer">
+        <span>Version 1.0.0</span>
+        <span>&copy; 2026 </span>
+    </div>
+</div>
+
+<script>
+    async function verifyLicense() {
+        const keyField = document.getElementById('keyInput');
+        const btn = document.getElementById('authBtn');
+        const status = document.getElementById('status');
+        const key = keyField.value.trim();
+
+        if (key === "") {
+            updateStatus("Bitte Key eingeben!", "var(--error)");
+            return;
+        }
+
+        // UI sperren
+        btn.disabled = true;
+        updateStatus("<span class='loading'></span>Verbinde mit Render-Server...", "#aaa");
+
+        try {
+            // ERSETZE DIESE URL MIT DEINER RENDER APP URL
+            const RENDER_URL = "https://DEINE-APP.onrender.com/verify";
+
+            const response = await fetch(RENDER_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ key: key })
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                updateStatus("Key akzeptiert! Starte...", "var(--success)");
+                
+                // Signal an C# WebView2 senden
+                if (window.chrome && window.chrome.webview) {
+                    window.chrome.webview.postMessage({
+                        action: "AUTH_SUCCESS",
+                        key: key,
+                        expires: data.expires
+                    });
+                }
+            } else {
+                updateStatus(data.message || "Key ungültig!", "var(--error)");
+                btn.disabled = false;
+            }
+
+        } catch (error) {
+            updateStatus("Server nicht erreichbar!", "var(--error)");
+            btn.disabled = false;
+        }
+    }
+
+    function updateStatus(text, color) {
+        const status = document.getElementById('status');
+        status.innerHTML = text;
+        status.style.color = color;
+    }
+</script>
+
+</body>
+</html>
